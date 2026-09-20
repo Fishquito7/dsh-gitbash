@@ -1,11 +1,19 @@
 # dsh-gitbash
 
+
 <p align="center">
   <b>给 DSH 在 Windows 上装一个真正的 bash 工具：调用 bash 不用再经过 pwsh 转义，告别转义地狱。</b>
 </p>
 
+
+
+
 <p align="center">
   <a href="README.en.md">English</a> · <b>中文</b>
+</p>
+
+<p align="center">
+<img width="344" height="109" alt="image" src="https://github.com/user-attachments/assets/5edb02f3-b502-4334-8290-d9c804c0c847" />
 </p>
 
 <p align="center">
@@ -14,6 +22,7 @@
   <img alt="license" src="https://img.shields.io/badge/license-MIT-3DA639?style=flat-square">
   <img alt="deps" src="https://img.shields.io/badge/dependencies-0-brightgreen?style=flat-square">
 </p>
+
 
 ---
 
