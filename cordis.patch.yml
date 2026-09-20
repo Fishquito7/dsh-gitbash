@@ -1,0 +1,21 @@
+# dsh-git-bash bundle patch.
+#
+# 把两行绑进同一个 "shell" 隔离 realm —— 不需要容器行：
+# loader 的 isolate 支持两种形态，isolate: <字符串> 会创建一个
+# "Named isolation realm shared by entries that use the same label"，
+# 因此下面两行写同一个标签即共享同一个作用域：
+#   · git-bash-executor 在该作用域内提供 ctx.shell（Git Bash 执行器）；
+#   · git-bash-tool      在该作用域内消费它，注册出标准的 bash 工具。
+# 宿主的 pwsh 执行器与 tool-pwsh 完全不受影响——只隔离了 shell 这一个名字。
+#
+# 想换 Git Bash 路径：设置环境变量 DSH_GIT_BASH，或改 lib/index.js 里的默认常量。
+- insert:
+    - id: git-bash-executor
+      name: dsh-git-bash
+      isolate:
+        shell: dsh-git-bash
+
+    - id: git-bash-tool
+      name: '@deepseek-ai/dsh-tool-bash'
+      isolate:
+        shell: dsh-git-bash

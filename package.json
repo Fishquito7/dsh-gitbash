@@ -1,0 +1,40 @@
+{
+  "name": "dsh-git-bash",
+  "version": "0.1.0",
+  "description": "Mount DSH's stock bash tool on Windows against Git Bash (no PowerShell in the path).",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "test",
+    "README.md",
+    "README.en.md"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Fishquito7/dsh-gitbash.git"
+  },
+  "homepage": "https://github.com/Fishquito7/dsh-gitbash#readme",
+  "bugs": {
+    "url": "https://github.com/Fishquito7/dsh-gitbash/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "bash",
+    "git-bash",
+    "windows"
+  ]
+}
