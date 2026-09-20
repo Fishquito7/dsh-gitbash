@@ -109,6 +109,18 @@ echo "argv0=$0"; uname -s; echo "bash=$BASH_VERSION"
 
 ---
 
+## Upgrade
+
+pnpm will not re-fetch a dependency it already has, so upgrade by **removing first**:
+
+```powershell
+dsh plugin --profile web remove dsh-git-bash
+dsh plugin --profile web add "https://github.com/Fishquito7/dsh-gitbash/releases/latest/download/dsh-git-bash.tgz"
+```
+
+Then restart DSH. To pin a version, swap the URL for the tag-qualified form.
+
+---
 ## Uninstall and rollback
 
 ```powershell
@@ -124,8 +136,17 @@ If anything misbehaves, you can instead switch off just the `git-bash-executor` 
 
 | Item | Meaning |
 |---|---|
-| `DSH_GIT_BASH` | Absolute path to the Git Bash executable. Defaults to `C:\Program Files\Git\bin\bash.exe`. |
-| Row `config` | All upstream `dsh-bash-local` fields are accepted: `cwd`, `timeoutMs`, `maxTimeoutMs`, `maxOutputBytes`, `maxSpillBytes`, `graceMs`. |
+| `bashPath` (row `config`) | Explicit absolute path to `bash.exe`; highest priority |
+| `DSH_GIT_BASH` | The same override through the environment |
+| Row `config` | All upstream `dsh-bash-local` fields are accepted: `cwd`, `timeoutMs`, `maxTimeoutMs`, `maxOutputBytes`, `maxSpillBytes`, `graceMs` |
+
+**No configuration is needed.** Git can live almost anywhere depending on install flavour (machine-wide, per-user, scoop, chocolatey), so the plugin looks for it in order:
+
+> row `config` `bashPath` → environment `DSH_GIT_BASH` → the `InstallPath` value under `HKLM` / `HKCU` `SOFTWARE\GitForWindows` → `%ProgramFiles%\Git\bin` → `%ProgramFiles(x86)%` → `%ProgramW6432%` → `%LOCALAPPDATA%\Programs\Git\bin` (per-user installs) → scoop → chocolatey → `bash.exe` in each PATH entry, plus `..\bin\bash.exe` next to any `git.exe`.
+>
+> That last one matters: **Git's installer puts `Git\cmd` on PATH and never `Git\bin`** — which is exactly why a bare `bash` is not found on Windows.
+>
+> If every candidate fails, the plugin does **not** fall back to WSL's `bash` (a Linux process in another kernel, wrong semantics); it reports an error listing every path it tried.
 
 ---
 
@@ -196,6 +217,10 @@ Because Git Bash is a **native Windows process**, while WSL bash is a Linux proc
 In one line: **working in a Windows workspace → Git Bash; needing a real Linux environment → run the whole DSH inside WSL** (then the shell, the file tools and the paths are all Linux-native and consistent). "DSH on Windows plus WSL bash" is the worst of both: the shell lives in Linux while the file tools live in Windows.
 
 This also explains why upstream disables `dsh-bash-local` outright on win32: a bare `bash` has no well-defined meaning on Windows — it may be the WSL launcher, or it may not exist at all.
+
+**Q: Git is not installed on C:, or lives somewhere unusual — will the plugin find it?**
+
+Yes. The first link in the chain has nothing to do with install location: Git for Windows registers itself under `HKLM\SOFTWARE\GitForWindows` (`HKCU` for per-user installs) in the `InstallPath` value. The full order is in the Configuration section above. If nothing is found, the error lists every path that was tried and tells you how to set `bashPath` or `DSH_GIT_BASH` explicitly.
 
 **Q: Can I switch to a different bash?**
 Set the `DSH_GIT_BASH` environment variable to any bash executable.

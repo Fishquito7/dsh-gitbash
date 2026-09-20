@@ -93,4 +93,15 @@ record('C3 非零退出码透传', r3.exitCode);
 const r5 = await run('echo out; ls /nonexistent-xyz >/dev/null');
 record('C4 stderr 文本', JSON.stringify(r5.stderr.text.trim().slice(0, 90)));
 
+
+// ---- D) 解析链与报错质量 ----
+import { candidateBashPaths as probeCandidates, resolveBashPath as probeResolve } from 'dsh-git-bash';
+try { record('D1 自动解析结果', probeResolve()); } catch (e) { record('D1 自动解析结果', 'FAIL ' + e.message.split(String.fromCharCode(10))[0]); }
+record('D2 候选数量', probeCandidates().length);
+record('D3 候选前两条', probeCandidates().slice(0, 2).join('  |  '));
+const savedBash = process.env.DSH_GIT_BASH;
+process.env.DSH_GIT_BASH = 'C:\\nope\\bash.exe';
+try { probeResolve(); record('D4 显式指向不存在', '未抛错(意外)'); } catch (e) { record('D4 显式指向不存在', e.message.slice(0, 95)); }
+if (savedBash === undefined) delete process.env.DSH_GIT_BASH; else process.env.DSH_GIT_BASH = savedBash;
+
 console.log(rows.join(String.fromCharCode(10)));

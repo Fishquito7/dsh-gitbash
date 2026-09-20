@@ -109,6 +109,18 @@ echo "argv0=$0"; uname -s; echo "bash=$BASH_VERSION"
 
 ---
 
+## 升级
+
+pnpm 不会自动重新拉取同名依赖，所以升级要**先移除再安装**：
+
+```powershell
+dsh plugin --profile web remove dsh-git-bash
+dsh plugin --profile web add "https://github.com/Fishquito7/dsh-gitbash/releases/latest/download/dsh-git-bash.tgz"
+```
+
+然后重启 DSH。想锁版本就把 URL 换成带 tag 的形式。
+
+---
 ## 卸载与回滚
 
 ```powershell
@@ -124,8 +136,17 @@ dsh plugin --profile web remove dsh-git-bash
 
 | 项 | 说明 |
 |---|---|
-| `DSH_GIT_BASH` | Git Bash 可执行文件的绝对路径。默认 `C:\Program Files\Git\bin\bash.exe`。 |
-| 行 `config` | 沿用上游 `dsh-bash-local` 的全部字段：`cwd`、`timeoutMs`、`maxTimeoutMs`、`maxOutputBytes`、`maxSpillBytes`、`graceMs`。 |
+| `bashPath`（行 `config`） | 显式指定 `bash.exe` 绝对路径，优先级最高 |
+| `DSH_GIT_BASH` | 同上，走环境变量 |
+| 行 `config` | 沿用上游 `dsh-bash-local` 的全部字段：`cwd`、`timeoutMs`、`maxTimeoutMs`、`maxOutputBytes`、`maxSpillBytes`、`graceMs` |
+
+**不配置也能用。** Git 的安装位置与安装习惯因人而异（机器级 / 用户级 / scoop / chocolatey），所以插件自己按顺序找：
+
+> 行 `config` 的 `bashPath` → 环境变量 `DSH_GIT_BASH` → 注册表 `HKLM` / `HKCU` 下 `SOFTWARE\GitForWindows` 的 `InstallPath` → `%ProgramFiles%\Git\bin` → `%ProgramFiles(x86)%` → `%ProgramW6432%` → `%LOCALAPPDATA%\Programs\Git\bin`（用户级安装）→ scoop → chocolatey → PATH 里各项的 `bash.exe`，以及 `git.exe` 同级的 `..\bin\bash.exe`。
+>
+> 最后一条很关键：**Git 安装器默认只把 `Git\cmd` 放进 PATH，从不放 `Git\bin`** —— 这正是裸 `bash` 在 Windows 上找不到的原因。
+>
+> 全部落空时**不会**退到 WSL 的 `bash`（那是另一个内核里的 Linux 进程，语义不对），而是报一条列出所有尝试路径的错误。
 
 ---
 
@@ -196,6 +217,10 @@ isolate 隔离作用域  tool-bash ──► ctx.shell（隔离作用域）  = G
 一句话：**在 Windows 工作区里干活 → 用 Git Bash；要真 Linux 环境 → 把整个 DSH 搬进 WSL**（那时 shell、文件工具、路径全是 Linux 原生的，才自洽）。「Windows 上的 DSH + WSL bash」两头不靠：shell 在 Linux，文件工具在 Windows。
 
 顺带这也解释了上游为什么直接在 win32 上禁用 `dsh-bash-local`：裸 `bash` 在 Windows 上语义并不明确 —— 可能是 WSL 启动器，也可能根本不存在。
+
+**Q：Git 没装在 C 盘，或者装在别的位置，会找不到吗？**
+
+不会。解析链的第一条与安装位置无关：Git for Windows 会把自己登记进注册表 `HKLM\SOFTWARE\GitForWindows`（用户级安装是 `HKCU`）的 `InstallPath`。完整顺序见上面「配置」一节。真的一个都找不到时，报错会逐条列出尝试过的路径，并告诉你怎么用 `bashPath` 或 `DSH_GIT_BASH` 显式指定。
 
 **Q：想换成别的 bash 怎么办？**
 设置环境变量 `DSH_GIT_BASH` 指向任意 bash 可执行文件即可。

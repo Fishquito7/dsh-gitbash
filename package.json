@@ -1,6 +1,6 @@
 {
   "name": "dsh-git-bash",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Mount DSH's stock bash tool on Windows against Git Bash (no PowerShell in the path).",
   "type": "module",
   "main": "lib/index.js",
