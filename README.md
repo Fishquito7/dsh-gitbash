@@ -152,7 +152,7 @@ dsh plugin --profile web remove dsh-git-bash
 
 ## 原理
 
-一句话：**工具只负责"暴露能力"，真正执行命令的是 `ctx.shell` 这个服务；而一个进程里 `ctx.shell` 只能绑一个实现，所以我们用一个 `isolate` 隔离作用域来放第二份绑定。**
+**工具只负责"暴露能力"，真正执行命令的是 `ctx.shell` 这个服务；而一个进程里 `ctx.shell` 只能绑一个实现，所以我们用一个 `isolate` 隔离作用域来放第二份绑定。**
 
 拆开看是三件事：
 
@@ -213,8 +213,6 @@ isolate 隔离作用域  tool-bash ──► ctx.shell（隔离作用域）  = G
 | 与 DSH 文件工具（`read`/`edit`/`glob`） | 操作**同一批文件**，路径模型一致 | 路径模型分裂，模型要自己翻译路径 |
 | 文件 I/O | 原生 NTFS | `/mnt/c` 走转发，小文件密集操作明显更慢 |
 | 真 Linux 工具链 | ✗ 无 fork / apt / systemd，MSYS 还会改写形似路径的参数 | ✅ 完整 |
-
-一句话：**在 Windows 工作区里干活 → 用 Git Bash；要真 Linux 环境 → 把整个 DSH 搬进 WSL**（那时 shell、文件工具、路径全是 Linux 原生的，才自洽）。「Windows 上的 DSH + WSL bash」两头不靠：shell 在 Linux，文件工具在 Windows。
 
 顺带这也解释了上游为什么直接在 win32 上禁用 `dsh-bash-local`：裸 `bash` 在 Windows 上语义并不明确 —— 可能是 WSL 启动器，也可能根本不存在。
 
