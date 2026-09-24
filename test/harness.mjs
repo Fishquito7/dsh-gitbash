@@ -77,8 +77,15 @@ record('B1 直接挂父类的结果', bErr);
 record('B2 屏蔽后总次数(应=1)', installs);
 
 // ---- C) 真跑命令 ----
+// 兼容两代 seam：新版走 resolve() + execute() -> ShellProcess.result()；
+// 旧版走 resolve() + run() -> { result }。
 const run = async function (command) {
-  return realm.shell.run(realm.shell.resolve({ command: command }));
+  const spec = realm.shell.resolve({ command: command });
+  if (typeof realm.shell.execute === 'function') {
+    const proc = await realm.shell.execute(spec);
+    return await proc.result();
+  }
+  return realm.shell.run(spec);
 };
 
 const r1 = await run('echo "argv0=$0"; uname -s; echo "bash=$BASH_VERSION"');
@@ -103,5 +110,43 @@ const savedBash = process.env.DSH_GIT_BASH;
 process.env.DSH_GIT_BASH = 'C:\\nope\\bash.exe';
 try { probeResolve(); record('D4 显式指向不存在', '未抛错(意外)'); } catch (e) { record('D4 显式指向不存在', e.message.slice(0, 95)); }
 if (savedBash === undefined) delete process.env.DSH_GIT_BASH; else process.env.DSH_GIT_BASH = savedBash;
+
+// ---- E) 回归：上游内部方法改名/消失后，替换缝仍然生效 ----
+// 直接调用基类的 execute —— 它写死了裸 "bash"，等于模拟"某个未来版本又换掉了
+// executeArgv，或干脆走回基类实现"：subprocess 包装必须仍然把它换成 Git Bash。
+const specBase = realm.shell.resolve({ command: 'echo "base=$0"; uname -s' });
+const procBase = await LocalBashExecutor.prototype.execute.call(realm.shell, specBase);
+const rBase = await procBase.result();
+record('E1 基类裸 bash 仍走 Git Bash', JSON.stringify(rBase.stdout.text.trim()));
+record('E2 走基类时的退出码', rBase.exitCode);
+
+// ---- F) 收口点：spawnSpec 只换裸 bash，其余 argv 原样 ----
+const specF = realm.shell.resolve({ command: 'echo hi' });
+const cfgF1 = realm.shell.spawnSpec(specF, ['bash', '-c', 'echo hi'], 64000, undefined);
+record('F1 裸 bash 换成解析结果', cfgF1.argv[0]);
+const cfgF2 = realm.shell.spawnSpec(specF, ['git', 'status'], 64000, undefined);
+record('F2 非 bash 原样透传', JSON.stringify(cfgF2.argv));
+const cfgF3 = realm.shell.spawnSpec(specF, ['C:\\Program Files\\Git\\bin\\bash.exe', '-c', 'echo hi'], 64000, undefined);
+record('F3 绝对路径不被动', cfgF3.argv[0]);
+record('F4 spawn 配置其余字段仍在', JSON.stringify([typeof cfgF1.cwd, typeof cfgF1.stdio, cfgF1.graceMs]));
+
+// ---- G) 自检日志：首次执行时走公开路径确认 shell 身份 ----
+await tick();
+await tick();
+const logged = (root.logger && root.logger.buffer ? root.logger.buffer : []).map(function (m) {
+  try { return JSON.stringify(m); } catch (e) { return String(m); }
+}).join(' ');
+record('G0 挂载日志里有解析结果', /bash\.exe ->/.test(logged));
+record('G1 自检结论', /self-check ok/.test(logged) ? 'ok' : logged.slice(0, 180));
+
+// ---- H) 行 config 的 bashPath 覆盖（模块级配置，放在最后） ----
+const realm3 = root.isolate('shell');
+realm3.plugin(plugin, Object.assign({}, CONFIG, { bashPath: 'C:\\nope\\explicit\\bash.exe' }));
+await tick();
+try {
+  record('H1 bashPath 覆盖生效', '未抛错(意外): ' + probeResolve());
+} catch (e) {
+  record('H1 bashPath 覆盖生效', e.message.slice(0, 88));
+}
 
 console.log(rows.join(String.fromCharCode(10)));

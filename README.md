@@ -167,7 +167,7 @@ DSH 里的 `shell` 是一个服务。Windows 上它被绑死到 PowerShell 执�
 `isolate` 是组合里声明**隔离作用域**的写法（直观理解就是「一个小盒子」）：在**隔离作用域**内，`shell` 这个名字**重新绑到另一个实现** —— **名字没变，只是绑的键不同**；隔离作用域之外完全不受影响。
 隔离作用域里我们放两样东西：
 
-1. 一个"把命令交给 Git Bash 执行"的执行器 —— 本插件新增，核心约 20 行；
+1. 一个"把命令交给 Git Bash 执行"的执行器 —— 本插件新增，核心约 30 行；
 2. **上游原版**的 bash 工具 —— 零改动。它照旧只写 `ctx.shell.run(...)`，只不过在隔离作用域里，这句话落到了 Git Bash 上。
 
 ```text
@@ -185,7 +185,8 @@ isolate 隔离作用域  tool-bash ──► ctx.shell（隔离作用域）  = G
 ## 边界与已知限制
 
 - **不经过文件沙箱**：命令以 DSH 进程自身的权限执行，不会产生 `[sandbox: file access denied]` 之类的提示。原因很实际 —— Git Bash 是 MSYS2 进程，在 Windows 受限令牌下需要 fork、管道与私有临时目录，行为不可靠，因此有意不接沙箱。
-- **依赖上游内部接口**：执行器复用了上游 `dsh-bash-local` 提供的 argv 替换缝。若 DSH 大版本改动该接口，需要同步更新本插件。
+- **只跟一个收口点，不跟上游的入口命名**：上游 `dsh-bash-local` 的子类入口改过名（`run`/`start` + `runArgv`/`startArgv` → `execute`/`executeArgv`），但每条执行路径最终都要经过 `spawnSpec(spec, argv, …)` 把 argv 落成 spawn 配置。本插件就在这个收口点把裸 `bash` 换成解析出来的 Git Bash，所以入口再改名也不会退回裸 `bash`；命名过的入口照旧覆盖一层，作为第二道保险。首次执行时还会走一遍公开路径（`resolve` → `execute` → `result`）自检并把 shell 身份写进日志 —— 万一上游连收口点都换掉，日志里会直接出现 `self-check FAILED`，而不是让命令输出一片乱码。
+- **只读、不动环境**：解析全程只读注册表并反推 PATH；不改 `PATH`、不改注册表、不改 DSH 自身，升级 DSH 后不需要任何额外配置。
 - **`file:` 依赖是拷贝，不是软链**：改完代码后要 `remove` → `add` → 重启才会生效。
 - **仅 Windows 需要**：POSIX 平台上 DSH 本来就有 bash 工具，装这个插件没有意义。
 
@@ -230,7 +231,7 @@ isolate 隔离作用域  tool-bash ──► ctx.shell（隔离作用域）  = G
 ```text
 dsh-gitbash/      # 仓库名；包名仍是 dsh-git-bash
 ├─ cordis.patch.yml   # 组合补丁：隔离作用域 + 两行声明
-├─ lib/index.js       # 执行器插件（核心约 20 行）
+├─ lib/index.js       # 执行器插件（核心约 30 行）
 ├─ test/harness.mjs   # 离线验证脚本（真实 cordis 驱动，无需启动 DSH）
 ├─ package.json       # 零依赖
 └─ README.md
@@ -242,7 +243,7 @@ dsh-gitbash/      # 仓库名；包名仍是 dsh-git-bash
 node test/harness.mjs
 ```
 
-脚本会检查：宿主 shell 未被顶替、隔离作用域内解析到本执行器、设置段零重复注册、真实 Git Bash 身份、通配符与 `$(...)` 展开、退出码透传、stderr 分离。
+脚本会检查：宿主 shell 未被顶替、隔离作用域内解析到本执行器、设置段零重复注册、真实 Git Bash 身份、通配符与 `$(...)` 展开、退出码透传、stderr 分离、`spawnSpec` 收口点仍把裸 `bash` 换成 Git Bash（即上游入口改名后走的路径）、以及首次执行的自检结论。
 
 打包：
 

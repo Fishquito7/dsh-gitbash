@@ -167,7 +167,7 @@ On top of that, one DSH process allows **exactly one implementation per service 
 `isolate` is how a composition declares an **isolation scope** (picture a small box): inside that scope the name `shell` is **bound to a different implementation** — **the name is unchanged, only the key behind it differs** — and everything outside the scope is untouched.
 Inside the isolation scope we mount two things:
 
-1. an executor that hands commands to Git Bash — added by this plugin, about 20 lines of core code;
+1. an executor that hands commands to Git Bash — added by this plugin, about 30 lines of core code;
 2. the **stock upstream bash tool** — zero changes. It still just calls `ctx.shell.run(...)`; inside the isolation scope, that call lands on Git Bash.
 
 ```text
@@ -185,7 +185,8 @@ isolate scope      tool-bash ──► ctx.shell (isolation scope)  = Git Bash e
 ## Boundaries and known limitations
 
 - **No file sandboxing**: commands run with the DSH process authority and never produce `[sandbox: file access denied]`. The reason is practical — Git Bash is an MSYS2 process that needs fork, pipes and a private temp directory, which behaves unreliably under the Windows restricted token, so sandboxing is deliberately not wired in.
-- **Depends on an upstream internal seam**: the executor reuses the argv-replacement seam provided by `dsh-bash-local`. A major DSH change to that interface requires updating this plugin.
+- **Bound to one choke point, not to upstream entry-point names**: `dsh-bash-local`'s subclass entry points have already been renamed once (`run`/`start` + `runArgv`/`startArgv` → `execute`/`executeArgv`), yet every execution path still funnels through `spawnSpec(spec, argv, …)` to turn an argv into a spawn config. The plugin swaps the bare `bash` for the resolved Git Bash exactly there, so another rename of an entry point cannot silently fall back to bare `bash`; the named entry points are overridden as a second layer. On first use it also walks the public path (`resolve` → `execute` → `result`) and logs the shell identity — should upstream ever move the choke point too, the log says `self-check FAILED` instead of letting command output come back garbled.
+- **Read-only, no environment changes**: resolution only reads the registry and reverse-engineers `PATH`; it never edits `PATH`, the registry or DSH itself, so a DSH upgrade needs no reconfiguration.
 - **`file:` dependencies are copies, not symlinks**: after editing the code you must `remove` → `add` → restart for the change to take effect.
 - **Windows only**: on POSIX platforms DSH already ships a bash tool, so this plugin has nothing to add.
 
@@ -232,7 +233,7 @@ Set the `DSH_GIT_BASH` environment variable to any bash executable.
 ```text
 dsh-gitbash/      # repository name; the package stays dsh-git-bash
 ├─ cordis.patch.yml   # composition patch: isolation scope + two rows
-├─ lib/index.js       # the executor plugin (~20 lines of core code)
+├─ lib/index.js       # the executor plugin (~30 lines of core code)
 ├─ test/harness.mjs   # offline harness driven by a real cordis, no DSH boot needed
 ├─ package.json       # zero dependencies
 └─ README.md
@@ -244,7 +245,7 @@ Offline verification (the package must already sit on a profile resolution chain
 node test/harness.mjs
 ```
 
-The harness checks that the host shell was not replaced, that the isolation scope resolves to this executor, that no settings section is registered twice, that the shell really is Git Bash, that globs and `$(...)` expand, that exit codes propagate and that stderr is separated.
+The harness checks that the host shell was not replaced, that the isolation scope resolves to this executor, that no settings section is registered twice, that the shell really is Git Bash, that globs and `$(...)` expand, that exit codes propagate, that stderr is separated, that the `spawnSpec` choke point still swaps a bare `bash` for Git Bash (the path taken after an upstream entry-point rename), and what the first-use self-check reports.
 
 Packaging:
 
